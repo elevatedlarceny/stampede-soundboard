@@ -1059,6 +1059,7 @@ function setupGlobal() {
   document.getElementById('be-import-btn').onclick    = () => document.getElementById('board-import-input').click();
   const bii = document.getElementById('board-import-input');
   bii.onchange = () => { if (bii.files[0]) { importBoard(bii.files[0]); bii.value = ''; } };
+  document.getElementById('be-import-url').onclick    = importBoardFromUrl;
   document.getElementById('be-delete').onclick        = deleteBoardAction;
   document.getElementById('df-save').onclick          = saveDefaults;
   document.getElementById('modal-play-btn').onclick   = modalPlayPreview;
@@ -1279,6 +1280,22 @@ async function importBoard(source) {
     toast('Imported: ' + newBoard.name);
   } catch (e) {
     toast('Import failed — check file');
+    console.error(e);
+  }
+}
+
+/* ── Import Board from a named URL (e.g. board-two.json) ────────────────── */
+async function importBoardFromUrl() {
+  const url = prompt('Board JSON URL or filename (e.g. board-two.json):');
+  if (!url || !url.trim()) return;
+  toast('Fetching…');
+  try {
+    const res = await fetch(url.trim());
+    if (!res.ok) { toast('Could not fetch — check the URL'); return; }
+    const data = await res.json();
+    await importBoard(data);
+  } catch (e) {
+    toast('Import failed — check URL');
     console.error(e);
   }
 }
