@@ -1,4 +1,4 @@
-const CACHE = 'stampede-v2';
+const CACHE = 'stampede-v3';
 const STATIC = [
   './', './index.html', './css/style.css',
   './js/bundle.js', './manifest.json',
@@ -21,6 +21,12 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
