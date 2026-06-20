@@ -1,0 +1,35 @@
+{
+  "format": "stampede-board-v1",
+  "exportedAt": "2026-06-20T19:44:43.218Z",
+  "board": {
+    "name": "Board 1",
+    "color": "#16213e"
+  },
+  "tracks": [
+    {
+      "id": "mqmrnuacv8k5q1xp3vf",
+      "boardId": "mqmr5tx8zb4gzd9iniq",
+      "name": "The Mane Event OUTRO",
+      "type": "track",
+      "color": "#0f3460",
+      "image": null,
+      "order": 0,
+      "gridCol": 0,
+      "gridRow": 0,
+      "volume": 1,
+      "fadeIn": 0,
+      "fadeOut": 3,
+      "trimStart": 0,
+      "trimEnd": 0,
+      "autoFadeOnStop": true,
+      "autoPlayNext": false,
+      "loop": false,
+      "hideLabel": false,
+      "hotkey": null,
+      "tags": [],
+      "audioFile": "The Mane Event OUTRO.mp3",
+      "hasPlayed": false,
+      "audioUrl": "audio/The Mane Event OUTRO.mp3"
+    }
+  ]
+}
