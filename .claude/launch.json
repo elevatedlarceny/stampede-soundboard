@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "soundboard",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "3737", "-c", "/Users/kleff/Desktop/Stampede Soundboard/serve.json", "/Users/kleff/Desktop/Stampede Soundboard"],
+      "port": 3737
+    }
+  ]
+}

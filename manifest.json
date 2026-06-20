@@ -1,0 +1,14 @@
+{
+  "name": "MVC Mustangs - Stampede Soundboard",
+  "short_name": "Stampede",
+  "description": "MVC Mustangs multi-track soundboard",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000000",
+  "theme_color": "#0033a0",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

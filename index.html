@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0033a0">
+  <title>MVC Mustangs - Stampede Soundboard</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css?v=15">
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header id="header">
+  <img id="header-logo" src="icons/logo.png" alt="Monte Vista Christian Stampede Soundboard"
+       onerror="this.style.display='none'">
+  <div id="header-actions">
+    <button id="btn-import-header">＋ Import</button>
+    <button id="btn-add-label">＋ Label</button>
+    <button id="btn-defaults">Defaults</button>
+    <button id="btn-reset">Reset</button>
+    <button id="btn-mute">Mute</button>
+  </div>
+</header>
+
+<!-- ── Board tabs ── -->
+<nav id="board-tabs"></nav>
+
+<!-- ── Filter bar (shown when any track has tags) ── -->
+<div id="filter-bar"></div>
+
+<!-- ── Edit mode bar (shown when rearranging tiles) ── -->
+<div id="edit-mode-bar" class="hidden">
+  <span>✎ Drag tiles to rearrange</span>
+  <button id="btn-edit-done">Done</button>
+</div>
+
+<!-- ── Grid ── -->
+<div id="grid-wrap">
+  <div id="track-grid"></div>
+</div>
+
+<!-- ── Hidden file inputs ── -->
+<input type="file" id="file-input"  accept="audio/*" multiple style="display:none">
+<input type="file" id="logo-input" accept="image/*"          style="display:none">
+
+<!-- ── Track editor modal ── -->
+<div id="track-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Track Settings <button class="modal-close">✕</button></h2>
+
+    <div class="form-row">
+      <label>Name</label>
+      <input type="text" id="te-name">
+    </div>
+
+    <div class="form-row row-inline">
+      <label>Color</label>
+      <input type="color" id="te-color">
+    </div>
+
+    <div class="form-row row-inline" id="te-hide-label-row" style="display:none">
+      <label>Hide text label</label>
+      <input type="checkbox" id="te-hide-label">
+    </div>
+
+    <!-- Audio-only fields (hidden for label tiles) -->
+    <div class="audio-fields">
+      <div class="form-row">
+        <label>Volume: <span id="te-vol-val"></span></label>
+        <input type="range" id="te-volume" min="0" max="1" step="0.01"
+               oninput="document.getElementById('te-vol-val').textContent=Math.round(this.value*100)+'%'">
+      </div>
+      <div class="form-row">
+        <label>Fade In (seconds)</label>
+        <input type="number" id="te-fadein" min="0" max="30" step="0.5">
+      </div>
+
+      <div class="form-row">
+        <label>Fade Out (seconds)</label>
+        <input type="number" id="te-fadeout" min="0" max="30" step="0.5">
+      </div>
+
+      <div class="form-row">
+        <label>Trim Start (mm:ss)</label>
+        <input type="text" id="te-trimstart" placeholder="00:00" inputmode="numeric">
+      </div>
+
+      <div class="form-row">
+        <label>Trim End — from end (mm:ss)</label>
+        <input type="text" id="te-trimend" placeholder="00:00" inputmode="numeric">
+      </div>
+
+      <div class="form-row row-inline">
+        <label>Auto-fadeout when stopped</label>
+        <input type="checkbox" id="te-autofade">
+      </div>
+
+      <div class="form-row row-inline">
+        <label>Auto-play next track on end</label>
+        <input type="checkbox" id="te-autonext">
+      </div>
+
+      <div class="form-row row-inline">
+        <label>Loop</label>
+        <input type="checkbox" id="te-loop">
+      </div>
+
+      <div class="form-row">
+        <label>Hotkey</label>
+        <div class="hotkey-capture-row">
+          <input type="text" id="te-hotkey" class="hotkey-input" placeholder="Click, then press a key" readonly>
+          <button class="btn-secondary" id="te-hotkey-clear" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label>Tags <span class="tag-hint">(comma-separated)</span></label>
+        <input type="text" id="te-tags" placeholder="entrance, timeout, halftime…">
+      </div>
+
+      <p class="info-text">Duration: <span id="te-duration">—</span></p>
+
+      <!-- Waveform player -->
+      <div class="waveform-section">
+        <div class="waveform-wrap">
+          <canvas id="waveform-canvas"></canvas>
+          <div id="waveform-playhead"></div>
+        </div>
+        <div class="waveform-controls">
+          <button id="modal-play-btn" class="btn-secondary">▶ Play</button>
+          <span id="modal-time" class="info-text">00:00 / 00:00</span>
+        </div>
+        <div class="waveform-set-btns">
+          <button id="modal-set-start" class="btn-secondary">⟵ Set Trim Start</button>
+          <button id="modal-set-end"   class="btn-secondary">Set Trim End ⟶</button>
+        </div>
+        <p class="info-text" style="font-size:.7rem">Tap waveform to seek · Use buttons to set trim points</p>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label>Move / Copy to Board</label>
+      <div class="board-action-row">
+        <select id="te-board"></select>
+        <button class="btn-secondary" onclick="moveTrackToBoard()">Move</button>
+        <button class="btn-success"   onclick="copyTrackToBoard()">Copy</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button id="te-save" class="btn-success">Save</button>
+      <button id="te-replace-audio" class="btn-secondary audio-field-btn">Replace Audio</button>
+      <button id="te-normalize" class="btn-secondary audio-field-btn">Normalize Vol</button>
+      <button id="te-add-image" class="btn-secondary">Set Image</button>
+      <button id="te-remove-image" class="btn-secondary" style="display:none">Remove Image</button>
+      <button id="te-duplicate" class="btn-secondary">Duplicate</button>
+      <button id="te-delete" class="btn-danger">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Board editor modal ── -->
+<div id="board-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Board Settings <button class="modal-close">✕</button></h2>
+    <div class="form-row">
+      <label>Name</label>
+      <input type="text" id="be-name">
+    </div>
+    <div class="form-row row-inline">
+      <label>Color</label>
+      <input type="color" id="be-color">
+    </div>
+    <div class="modal-actions">
+      <button id="be-save" class="btn-primary">Save</button>
+      <button id="be-export" class="btn-secondary">Export Board</button>
+      <button id="be-github" class="btn-secondary">GitHub Export</button>
+      <button id="be-import-btn" class="btn-secondary">Import Board</button>
+      <button id="be-delete" class="btn-danger">Delete Board</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="board-import-input" accept=".json" style="display:none">
+
+<!-- ── Defaults modal ── -->
+<div id="defaults-modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>Default Track Settings <button class="modal-close">✕</button></h2>
+    <p class="info-text">Applied to all newly imported tracks.</p>
+
+    <div class="form-row">
+      <label>Volume: <span id="df-vol-val"></span></label>
+      <input type="range" id="df-volume" min="0" max="1" step="0.01"
+             oninput="document.getElementById('df-vol-val').textContent=Math.round(this.value*100)+'%'">
+    </div>
+    <div class="form-row">
+      <label>Fade In (seconds)</label>
+      <input type="number" id="df-fadein" min="0" max="30" step="0.5">
+    </div>
+    <div class="form-row">
+      <label>Fade Out (seconds)</label>
+      <input type="number" id="df-fadeout" min="0" max="30" step="0.5">
+    </div>
+    <div class="form-row row-inline">
+      <label>Auto-fadeout when stopped</label>
+      <input type="checkbox" id="df-autofade">
+    </div>
+    <div class="form-row row-inline">
+      <label>Auto-play next track on end</label>
+      <input type="checkbox" id="df-autonext">
+    </div>
+    <div class="form-row row-inline">
+      <label>Enable hotkeys</label>
+      <input type="checkbox" id="df-hotkeys">
+    </div>
+    <div class="modal-actions">
+      <button id="df-save" class="btn-primary">Save Defaults</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"></div>
+
+<script src="js/bundle.js?v=15"></script>
+</body>
+</html>
