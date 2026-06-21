@@ -5,3 +5,16 @@ is the property of the copyright holder and is provided for use by
 Monte Vista Christian School. No part of this application may be copied,
 modified, distributed, sublicensed, or used to create derivative works
 without prior written permission from the copyright holder.
+
+Third-Party Audio Content
+
+Audio files imported, uploaded, or played through this application
+remain the property of their respective copyright holders (artists,
+labels, publishers, or other rights holders). This license applies
+solely to the Stampede Soundboard software — its source code, design,
+and bundled visual assets — and does not grant, transfer, or claim any
+ownership or rights over third-party audio content used within the
+application. Users are responsible for ensuring they have the
+necessary rights or licenses to use any audio they upload, including
+any licensing that may be required for public performance at school
+events.
