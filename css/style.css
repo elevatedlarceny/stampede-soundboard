@@ -43,7 +43,7 @@ body {
   justify-content: space-between;
   padding: 0 14px 0 0;
   height: var(--header-h);
-  background: var(--gray);   /* #a2aaad — matches the image bg exactly */
+  background: var(--white);   /* matches the new header banner's white background */
   border-bottom: 3px solid var(--gray-dark);
   flex-shrink: 0;
   overflow: hidden;
