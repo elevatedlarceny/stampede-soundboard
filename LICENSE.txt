@@ -1,0 +1,7 @@
+Copyright © 2026–present D. Kleffer. All rights reserved.
+
+This software, including its source code, design, and associated assets,
+is the property of the copyright holder and is provided for use by
+Monte Vista Christian School. No part of this application may be copied,
+modified, distributed, sublicensed, or used to create derivative works
+without prior written permission from the copyright holder.
