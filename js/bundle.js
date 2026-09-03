@@ -149,6 +149,7 @@ let hotkeysEnabled = false;
 let activeFilter = null, _wakeLock = null;
 let dragTileId = null, dragGhost = null;
 let dragDropCol = -1, dragDropRow = -1;
+let dragTabId = null, tabTouchStartX = null, tabTouchDragging = false;
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function makeBoard(name) { return { id: uid(), name, color: '#16213e', order: boards.length }; }
@@ -268,14 +269,87 @@ function renderTabs() {
     const btn = document.createElement('button');
     btn.className = 'board-tab' + (b.id === currentBoardId ? ' active' : '');
     btn.textContent = b.name;
+    btn.dataset.boardId = b.id;
     btn.style.borderBottomColor = b.color;
-    btn.onclick = () => switchBoard(b.id);
+    btn.draggable = true;
+    btn.onclick = () => { if (!tabTouchDragging) switchBoard(b.id); };
     btn.oncontextmenu = e => { e.preventDefault(); openBoardEditor(b); };
-    // Long-press on touch devices opens board settings (same as right-click on desktop)
+
+    /* Desktop drag-to-reorder */
+    btn.ondragstart = e => {
+      dragTabId = b.id;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', b.id);
+      setTimeout(() => { btn.style.opacity = '0.4'; }, 0);
+    };
+    btn.ondragover = e => {
+      e.preventDefault();
+      if (!dragTabId || dragTabId === b.id) return;
+      e.dataTransfer.dropEffect = 'move';
+      const rect = btn.getBoundingClientRect();
+      const after = (e.clientX - rect.left) > rect.width / 2;
+      btn.classList.toggle('drop-before', !after);
+      btn.classList.toggle('drop-after', after);
+    };
+    btn.ondragleave = () => { btn.classList.remove('drop-before', 'drop-after'); };
+    btn.ondrop = e => {
+      e.preventDefault();
+      btn.classList.remove('drop-before', 'drop-after');
+      if (!dragTabId || dragTabId === b.id) return;
+      const rect = btn.getBoundingClientRect();
+      const after = (e.clientX - rect.left) > rect.width / 2;
+      reorderBoard(dragTabId, b.id, after);
+    };
+    btn.ondragend = () => {
+      btn.style.opacity = '';
+      bar.querySelectorAll('.board-tab').forEach(t => t.classList.remove('drop-before', 'drop-after'));
+      dragTabId = null;
+    };
+
+    // Long-press on touch devices opens board settings (same as right-click on desktop);
+    // dragging horizontally instead reorders tabs.
     let lpTimer = null;
-    btn.addEventListener('touchstart', () => { lpTimer = setTimeout(() => { lpTimer = null; openBoardEditor(b); }, 600); }, { passive: true });
-    btn.addEventListener('touchend',  () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } });
-    btn.addEventListener('touchmove', () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } });
+    btn.addEventListener('touchstart', e => {
+      tabTouchStartX = e.touches[0].clientX;
+      tabTouchDragging = false;
+      lpTimer = setTimeout(() => { lpTimer = null; openBoardEditor(b); }, 600);
+    }, { passive: true });
+    btn.addEventListener('touchmove', e => {
+      const dx = e.touches[0].clientX - tabTouchStartX;
+      if (!tabTouchDragging && Math.abs(dx) > 10) {
+        tabTouchDragging = true;
+        dragTabId = b.id;
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+      }
+      if (tabTouchDragging) {
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetTab = target && target.closest('.board-tab:not(.add-board)');
+        bar.querySelectorAll('.board-tab').forEach(t => t.classList.remove('drop-before', 'drop-after'));
+        if (targetTab && targetTab !== btn) {
+          const rect = targetTab.getBoundingClientRect();
+          const after = (touch.clientX - rect.left) > rect.width / 2;
+          targetTab.classList.toggle('drop-before', !after);
+          targetTab.classList.toggle('drop-after', after);
+        }
+      }
+    }, { passive: true });
+    btn.addEventListener('touchend', e => {
+      if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+      if (tabTouchDragging) {
+        const touch = e.changedTouches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetTab = target && target.closest('.board-tab:not(.add-board)');
+        if (targetTab && targetTab.dataset.boardId && targetTab.dataset.boardId !== dragTabId) {
+          const rect = targetTab.getBoundingClientRect();
+          const after = (touch.clientX - rect.left) > rect.width / 2;
+          reorderBoard(dragTabId, targetTab.dataset.boardId, after);
+        }
+      }
+      bar.querySelectorAll('.board-tab').forEach(t => t.classList.remove('drop-before', 'drop-after'));
+      dragTabId = null;
+      setTimeout(() => { tabTouchDragging = false; }, 50); // swallow the trailing click
+    });
     bar.appendChild(btn);
   });
   const add = document.createElement('button');
@@ -284,6 +358,20 @@ function renderTabs() {
   add.title = 'New board';
   add.onclick = addBoard;
   bar.appendChild(add);
+}
+
+/* Reorder boards array: move draggedId to just before/after targetId, persist order, re-render */
+async function reorderBoard(draggedId, targetId, after) {
+  const fromIdx = boards.findIndex(b => b.id === draggedId);
+  if (fromIdx === -1) return;
+  const [moved] = boards.splice(fromIdx, 1);
+  let toIdx = boards.findIndex(b => b.id === targetId);
+  if (toIdx === -1) toIdx = boards.length;
+  if (after) toIdx += 1;
+  boards.splice(toIdx, 0, moved);
+  boards.forEach((b, i) => { b.order = i; });
+  await Promise.all(boards.map(b => DB.putBoard(b)));
+  renderTabs();
 }
 
 function renderGrid() {
@@ -1349,7 +1437,7 @@ async function exportBoardForGithub() {
   }
   const exportTracks = tracks.map(t => {
     const copy = { ...t };
-    if (t.type !== 'label' && t.audioFile) copy.audioUrl = 'audio/' + t.audioFile;
+    if (t.type !== 'label' && t.audioFile) copy.audioUrl = 'audio/' + board.name + '/' + t.audioFile;
     return copy;
   });
   const blob = new Blob([JSON.stringify({
@@ -1362,7 +1450,7 @@ async function exportBoardForGithub() {
   const a = document.createElement('a'); a.href = url; a.download = 'board.json';
   a.click(); URL.revokeObjectURL(url);
   closeModal('board-modal');
-  toast('board.json downloaded — upload it + audio/ folder to GitHub');
+  toast('board.json downloaded — upload it + audio/' + board.name + '/ folder to GitHub');
 }
 
 /* ── Tag Filter ─────────────────────────────────────────────────────────── */
