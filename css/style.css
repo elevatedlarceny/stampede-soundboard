@@ -109,6 +109,8 @@ body {
 .board-tab:hover:not(.active) { color: var(--white); background: #2a2a2a; }
 .board-tab.add-board { color: var(--gray); font-size: 1.3rem; padding: 2px 12px; background: transparent; }
 .board-tab.add-board:hover { color: var(--white); }
+.board-tab.drop-before { box-shadow: inset 3px 0 0 var(--white); }
+.board-tab.drop-after { box-shadow: inset -3px 0 0 var(--white); }
 
 /* ── Grid ────────────────────────────────────────────────────────────────── */
 #grid-wrap {
