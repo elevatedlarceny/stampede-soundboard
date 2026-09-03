@@ -745,6 +745,7 @@ async function handleFiles(files) {
     t.volume = normalizeVolume(getBuffer(t.id));
     await DB.putTrack(t);
     tracks.push(t);
+    clearBuffer(t.id); // free decoded audio now; it's re-decoded on demand (playback/board switch/editor open)
   }
   renderGrid();
 }
@@ -757,7 +758,6 @@ function openTrackEditor(t) {
   const isLabel = t.type === 'label';
 
   if (isLabel) m.classList.add('is-label'); else m.classList.remove('is-label');
-
   m.querySelector('h2').childNodes[0].textContent = isLabel ? 'Label Settings ' : 'Track Settings ';
   m.querySelector('#te-name').value  = t.name;
   m.querySelector('#te-color').value = t.color;
@@ -793,7 +793,10 @@ function openTrackEditor(t) {
 
   m.classList.remove('hidden');
 
-  if (!isLabel) setTimeout(() => { precomputeWaveform(t.id); drawWaveformForModal(t.id); }, 60);
+  if (!isLabel) setTimeout(async () => {
+    if (!getBuffer(t.id)) { const rec = await DB.getAudio(t.id); if (rec) await decodeAudio(t.id, rec.blob); }
+    precomputeWaveform(t.id); drawWaveformForModal(t.id);
+  }, 60);
 }
 
 async function saveTrack() {
