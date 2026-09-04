@@ -932,6 +932,16 @@ function openBoardEditor(b) {
   m.querySelector('#be-name').value  = b.name;
   m.querySelector('#be-color').value = b.color;
   m.dataset.boardId = b.id;
+  const info = m.querySelector('#be-source-info');
+  info.innerHTML = b.sourceUrl
+    ? `Synced from: ${b.sourceUrl} <a href="#" id="be-change-source">(change)</a>`
+    : `Not linked to a source yet — "Check for Updates" will ask for one.`;
+  const changeLink = info.querySelector('#be-change-source');
+  if (changeLink) changeLink.onclick = async e => {
+    e.preventDefault();
+    const url = prompt('New source URL or filename:', b.sourceUrl || '');
+    if (url && url.trim()) { b.sourceUrl = url.trim(); await DB.putBoard(b); openBoardEditor(b); }
+  };
   m.classList.remove('hidden');
 }
 
@@ -1154,6 +1164,7 @@ function setupGlobal() {
   document.getElementById('te-remove-image').onclick  = removeTrackImage;
   document.getElementById('te-duplicate').onclick     = duplicateTrack;
   document.getElementById('be-save').onclick          = saveBoard;
+  document.getElementById('be-check-updates').onclick  = () => checkForUpdates(document.getElementById('board-modal').dataset.boardId);
   document.getElementById('be-export').onclick        = exportBoard;
   document.getElementById('be-github').onclick        = exportBoardForGithub;
   document.getElementById('be-import-btn').onclick    = () => document.getElementById('board-import-input').click();
@@ -1348,30 +1359,31 @@ async function exportBoard() {
 }
 
 /* ── Import Board ───────────────────────────────────────────────────────── */
-async function importBoard(source) {
+async function importBoard(source, sourceUrl) {
   toast('Importing…');
   try {
     const data = (source instanceof File) ? JSON.parse(await source.text()) : source;
     if (!data.board || !data.tracks) { toast('Invalid board file'); return; }
     const newBoard = makeBoard(data.board.name);
     newBoard.color = data.board.color || '#16213e';
+    newBoard.sourceUrl = sourceUrl || null;
     await DB.putBoard(newBoard);
     boards.push(newBoard);
     for (const src of data.tracks) {
       const newId = uid();
-      const newTrack = { ...src, id: newId, boardId: newBoard.id, hasPlayed: false };
+      const newTrack = { ...src, id: newId, boardId: newBoard.id, hasPlayed: false, sourceAudioUrl: src.audioUrl || null };
       delete newTrack.audioData; delete newTrack.audioUrl;
       await DB.putTrack(newTrack);
       if (src.type !== 'label') {
         if (src.audioUrl) {
           try {
             const r = await fetch(src.audioUrl);
-            if (r.ok) { const b = await r.blob(); await DB.putAudio(newId, b); await decodeAudio(newId, b); }
+            if (r.ok) { const b = await r.blob(); await DB.putAudio(newId, b); } // decoded lazily on first play
           } catch (_) {}
         } else if (src.audioData) {
           const r = await fetch(src.audioData);
           const b = await r.blob();
-          await DB.putAudio(newId, b); await decodeAudio(newId, b);
+          await DB.putAudio(newId, b);
         }
       }
     }
@@ -1393,11 +1405,113 @@ async function importBoardFromUrl() {
     const res = await fetch(url.trim());
     if (!res.ok) { toast('Could not fetch — check the URL'); return; }
     const data = await res.json();
-    await importBoard(data);
+    await importBoard(data, url.trim());
   } catch (e) {
     toast('Import failed — check URL');
     console.error(e);
   }
+}
+
+/* ── Check for Updates: refresh an already-imported board from its source
+   instead of creating a duplicate. Preserves local tile positions; only
+   re-downloads audio for tracks whose source file actually changed. ────── */
+async function checkForUpdates(boardId) {
+  const board = boards.find(b => b.id === boardId);
+  if (!board) return;
+  let src = board.sourceUrl;
+  if (!src) {
+    src = prompt('This board has no saved source yet.\nEnter its Board JSON URL or filename (e.g. board-cheer.json):');
+    if (!src || !src.trim()) return;
+    src = src.trim();
+  }
+  toast('Checking for updates…');
+  let data;
+  try {
+    const res = await fetch(src);
+    if (!res.ok) { toast('Could not fetch — check the URL'); return; }
+    data = await res.json();
+    if (!data.board || !data.tracks) { toast('Invalid board file'); return; }
+  } catch (e) {
+    toast('Check failed — check the URL');
+    console.error(e);
+    return;
+  }
+
+  const existing = await DB.getTracksForBoard(board.id);
+  const keyOf = t => t.type === 'label' ? 'label:' + t.name : 'audio:' + (t.audioFile || t.name);
+  const existingByKey = new Map();
+  existing.forEach(t => { const k = keyOf(t); if (!existingByKey.has(k)) existingByKey.set(k, t); });
+  const matchedIds = new Set();
+
+  const toAdd = [], toUpdate = [];
+  for (const s of data.tracks) {
+    const k = keyOf(s);
+    const match = existingByKey.get(k);
+    if (match) { matchedIds.add(match.id); toUpdate.push({ existing: match, src: s }); }
+    else { toAdd.push(s); }
+  }
+  const toRemove = existing.filter(t => !matchedIds.has(t.id));
+  const audioChanges = toUpdate.filter(({ existing: e, src: s }) =>
+    s.type !== 'label' && (s.audioUrl || null) !== (e.sourceAudioUrl || null)
+  ).length;
+
+  const summary = `${board.name}: ${toAdd.length} new, ${toUpdate.length} existing, ${toRemove.length} to remove` +
+    (audioChanges ? `, ${audioChanges} audio file(s) to re-download` : '') + `.\n\nApply these updates?`;
+  if (!confirm(summary)) { toast('Update cancelled'); return; }
+
+  for (const t of toRemove) {
+    stopTrack(t.id, 0); clearBuffer(t.id);
+    await DB.deleteAudio(t.id);
+    await DB.deleteTrack(t.id);
+  }
+
+  for (const { existing: e, src: s } of toUpdate) {
+    const merged = {
+      ...s, id: e.id, boardId: board.id,
+      gridCol: e.gridCol, gridRow: e.gridRow, order: e.order,
+      hasPlayed: e.hasPlayed, sourceAudioUrl: s.audioUrl || null
+    };
+    delete merged.audioUrl; delete merged.audioData;
+    await DB.putTrack(merged);
+    if (s.type !== 'label' && (s.audioUrl || null) !== (e.sourceAudioUrl || null) && s.audioUrl) {
+      try {
+        const r = await fetch(s.audioUrl);
+        if (r.ok) { const b = await r.blob(); await DB.putAudio(e.id, b); clearBuffer(e.id); }
+      } catch (_) {}
+    }
+  }
+
+  const cols = getGridCols();
+  const layout = [...existing];
+  function nextPos() {
+    for (let row = 0; row < 500; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (!layout.some(t => t.gridCol === col && t.gridRow === row)) return { col, row };
+      }
+    }
+    return { col: 0, row: 500 };
+  }
+  for (const s of toAdd) {
+    const newId = uid();
+    const pos = nextPos();
+    const newTrack = { ...s, id: newId, boardId: board.id, hasPlayed: false, gridCol: pos.col, gridRow: pos.row, sourceAudioUrl: s.audioUrl || null };
+    delete newTrack.audioUrl; delete newTrack.audioData;
+    await DB.putTrack(newTrack);
+    layout.push(newTrack);
+    if (s.type !== 'label' && s.audioUrl) {
+      try {
+        const r = await fetch(s.audioUrl);
+        if (r.ok) { const b = await r.blob(); await DB.putAudio(newId, b); }
+      } catch (_) {}
+    }
+  }
+
+  board.sourceUrl = src;
+  await DB.putBoard(board);
+  if (board.id === currentBoardId) await loadBoard(board.id);
+  render();
+  closeModal('board-modal');
+  toast(`Updated ${board.name}: +${toAdd.length} / ~${toUpdate.length} / \u2212${toRemove.length}`);
 }
 
 /* ── Auto-load from server (first visit on new device) ─────────────────── */
@@ -1412,11 +1526,12 @@ async function tryAutoLoad() {
     const board = boards[0];
     board.name = data.board.name;
     board.color = data.board.color || '#16213e';
+    board.sourceUrl = 'board.json';
     await DB.putBoard(board);
     let loaded = 0;
     for (const src of data.tracks) {
       const newId = uid();
-      const newTrack = { ...src, id: newId, boardId: board.id, hasPlayed: false };
+      const newTrack = { ...src, id: newId, boardId: board.id, hasPlayed: false, sourceAudioUrl: src.audioUrl || null };
       delete newTrack.audioData; delete newTrack.audioUrl;
       await DB.putTrack(newTrack);
       if (src.type !== 'label') {
@@ -1424,12 +1539,12 @@ async function tryAutoLoad() {
         if (url) {
           try {
             const r = await fetch(url);
-            if (r.ok) { const b = await r.blob(); await DB.putAudio(newId, b); await decodeAudio(newId, b); loaded++; }
+            if (r.ok) { const b = await r.blob(); await DB.putAudio(newId, b); loaded++; } // decoded lazily on first play
           } catch (_) {}
         } else if (src.audioData) {
           const r = await fetch(src.audioData);
           const b = await r.blob();
-          await DB.putAudio(newId, b); await decodeAudio(newId, b); loaded++;
+          await DB.putAudio(newId, b); loaded++;
         }
       }
     }
