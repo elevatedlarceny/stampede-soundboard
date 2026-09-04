@@ -1165,6 +1165,7 @@ function setupGlobal() {
   document.getElementById('te-duplicate').onclick     = duplicateTrack;
   document.getElementById('be-save').onclick          = saveBoard;
   document.getElementById('be-check-updates').onclick  = () => checkForUpdates(document.getElementById('board-modal').dataset.boardId);
+  document.getElementById('be-repair-audio').onclick   = repairMissingAudioForCurrentBoard;
   document.getElementById('be-export').onclick        = exportBoard;
   document.getElementById('be-github').onclick        = exportBoardForGithub;
   document.getElementById('be-import-btn').onclick    = () => document.getElementById('board-import-input').click();
@@ -1173,6 +1174,7 @@ function setupGlobal() {
   document.getElementById('be-import-url').onclick    = importBoardFromUrl;
   document.getElementById('be-delete').onclick        = deleteBoardAction;
   document.getElementById('df-save').onclick          = saveDefaults;
+  document.getElementById('repair-all-audio').onclick = repairAllBoardsAudio;
   document.getElementById('modal-play-btn').onclick   = modalPlayPreview;
   document.getElementById('modal-set-start').onclick  = setModalTrimStart;
   document.getElementById('modal-set-end').onclick    = setModalTrimEnd;
@@ -1358,7 +1360,64 @@ async function exportBoard() {
   toast('Exported: ' + board.name);
 }
 
-/* ── Import Board ───────────────────────────────────────────────────────── */
+/* ── Repair Missing Audio: re-fetch audio for tracks whose local blob is
+   missing (e.g. a fetch failed silently during an earlier import), using
+   each track's remembered sourceAudioUrl. Non-destructive — only fills in
+   gaps, never touches tracks that already have audio. ─────────────────── */
+async function repairBoardAudio(board, opts) {
+  opts = opts || {};
+  const all = await DB.getTracksForBoard(board.id);
+  const candidates = all.filter(t => t.type !== 'label');
+  let repaired = 0, failed = 0, noSource = 0;
+  for (const t of candidates) {
+    const rec = await DB.getAudio(t.id);
+    if (rec) continue; // already has audio, nothing to do
+    if (!t.sourceAudioUrl) { noSource++; continue; }
+    try {
+      const r = await fetch(t.sourceAudioUrl);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const b = await r.blob();
+      await DB.putAudio(t.id, b);
+      clearBuffer(t.id);
+      repaired++;
+    } catch (e) { failed++; }
+  }
+  if (!opts.silent) {
+    if (board.id === currentBoardId) { await loadBoard(board.id); render(); }
+    let msg = board.name + ': repaired ' + repaired;
+    if (failed) msg += ', ' + failed + ' still failed';
+    if (noSource) msg += ', ' + noSource + ' have no known source';
+    toast(msg);
+  }
+  return { repaired, failed, noSource };
+}
+
+async function repairMissingAudioForCurrentBoard() {
+  const boardId = document.getElementById('board-modal').dataset.boardId;
+  const board = boards.find(b => b.id === boardId);
+  if (!board) return;
+  toast('Checking ' + board.name + ' for missing audio…');
+  await repairBoardAudio(board);
+  closeModal('board-modal');
+}
+
+async function repairAllBoardsAudio() {
+  toast('Scanning all boards for missing audio…');
+  let totals = { repaired: 0, failed: 0, noSource: 0 };
+  for (const board of boards) {
+    toast('Repairing ' + board.name + '…');
+    const r = await repairBoardAudio(board, { silent: true });
+    totals.repaired += r.repaired; totals.failed += r.failed; totals.noSource += r.noSource;
+  }
+  if (currentBoardId) { await loadBoard(currentBoardId); render(); }
+  let msg = 'Repair complete — fixed ' + totals.repaired;
+  if (totals.failed) msg += ', ' + totals.failed + ' still failed (check network)';
+  if (totals.noSource) msg += ', ' + totals.noSource + ' have no known source (need manual Replace Audio)';
+  toast(msg);
+  closeModal('defaults-modal');
+}
+
+
 async function importBoard(source, sourceUrl) {
   toast('Importing…');
   try {
