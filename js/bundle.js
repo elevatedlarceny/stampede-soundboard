@@ -62,6 +62,21 @@ function getCtx() {
   return _ctx;
 }
 
+/* ── Reset Audio Engine: browsers can silently leave the shared AudioContext
+   bound to a now-invalid output device (e.g. after a Bluetooth/display audio
+   device change) — sound stops reaching speakers even though the context's
+   internal clock (and so the progress bar) keeps advancing normally. This
+   tears down and recreates the context, fixing that without a full reload. */
+async function resetAudioEngine() {
+  stopAll(0);
+  buffers.clear(); // decoded audio was tied to the old context; safe to clear, re-decodes on next play
+  if (_ctx) { try { await _ctx.close(); } catch (_) {} }
+  _ctx = null;
+  getCtx(); // recreate immediately, bound to the current default output device
+  render();
+  toast('Audio engine reset');
+}
+
 const buffers = new Map();
 const active  = new Map();
 
@@ -1175,6 +1190,7 @@ function setupGlobal() {
   document.getElementById('be-delete').onclick        = deleteBoardAction;
   document.getElementById('df-save').onclick          = saveDefaults;
   document.getElementById('repair-all-audio').onclick = repairAllBoardsAudio;
+  document.getElementById('reset-audio-engine').onclick = resetAudioEngine;
   document.getElementById('modal-play-btn').onclick   = modalPlayPreview;
   document.getElementById('modal-set-start').onclick  = setModalTrimStart;
   document.getElementById('modal-set-end').onclick    = setModalTrimEnd;
