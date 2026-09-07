@@ -1,7 +1,7 @@
 {
-  "name": "MVC Mustangs - Stampede Soundboard",
-  "short_name": "Stampede",
-  "description": "MVC Mustangs multi-track soundboard",
+  "name": "Gametime Sounds",
+  "short_name": "Gametime",
+  "description": "Multi-track soundboard for game day",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

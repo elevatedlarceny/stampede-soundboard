@@ -11,7 +11,7 @@ Third-Party Audio Content
 Audio files imported, uploaded, or played through this application
 remain the property of their respective copyright holders (artists,
 labels, publishers, or other rights holders). This license applies
-solely to the Stampede Soundboard software — its source code, design,
+solely to the Gametime Sounds software — its source code, design,
 and bundled visual assets — and does not grant, transfer, or claim any
 ownership or rights over third-party audio content used within the
 application. Users are responsible for ensuring they have the
