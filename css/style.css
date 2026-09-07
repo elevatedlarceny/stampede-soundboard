@@ -213,6 +213,7 @@ body {
   color: var(--white);
   text-shadow: 0 1px 5px rgba(0,0,0,.9), 0 0 10px rgba(0,0,0,.7);
   line-height: 1.2;
+  white-space: pre-line;
   word-break: break-word;
   pointer-events: none;
 }
@@ -381,6 +382,7 @@ body {
 
 .form-row input[type="text"],
 .form-row input[type="number"],
+.form-row textarea,
 .form-row select {
   background: #0a0a0a;
   border: 1px solid #333;
@@ -390,6 +392,7 @@ body {
   font-size: .85rem;
   width: 100%;
 }
+.form-row textarea { font-family: inherit; resize: vertical; }
 
 .form-row select option { background: #111; }
 .form-row input[type="range"] { width: 100%; accent-color: var(--blue); }
