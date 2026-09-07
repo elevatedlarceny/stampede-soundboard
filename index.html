@@ -23,6 +23,7 @@
   <img id="header-logo" src="icons/logo.png" alt="Gametime Sounds"
        onerror="this.style.display='none'">
   <div id="header-actions">
+    <select id="sport-filter" title="Show boards for..."></select>
     <button id="btn-import-header">＋ Import</button>
     <button id="btn-add-label">＋ Label</button>
     <button id="btn-defaults">Defaults</button>
@@ -180,6 +181,11 @@
       <label>Color</label>
       <input type="color" id="be-color">
     </div>
+    <div class="form-row">
+      <label>Group</label>
+      <input type="text" id="be-group" placeholder="e.g. Football, Basketball, Baseball">
+    </div>
+    <p class="info-text">Boards sharing the same Group sit together, with a divider between groups. Leave blank for no grouping.</p>
     <p class="info-text" id="be-source-info"></p>
     <div class="modal-actions">
       <button id="be-save" class="btn-primary">Save</button>
