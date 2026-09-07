@@ -165,6 +165,7 @@ let activeFilter = null, _wakeLock = null;
 let dragTileId = null, dragGhost = null;
 let dragDropCol = -1, dragDropRow = -1;
 let dragTabId = null, tabTouchStartX = null, tabTouchDragging = false;
+let sportFilter = '__ALL__';
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function makeBoard(name) { return { id: uid(), name, color: '#16213e', order: boards.length }; }
@@ -236,10 +237,13 @@ async function init() {
   await openDB();
   defaults = (await DB.getSetting('defaults')) || { volume:1, fadeIn:0, fadeOut:3, trimStart:0, trimEnd:0, autoFadeOnStop:true, autoPlayNext:false };
   hotkeysEnabled = !!(await DB.getSetting('hotkeysEnabled'));
+  sportFilter = (await DB.getSetting('sportFilter')) || '__ALL__';
   boards = await DB.getBoards();
   boards.sort((a,b) => a.order - b.order);
   if (!boards.length) { const b = makeBoard('Board 1'); await DB.putBoard(b); boards = [b]; }
-  currentBoardId = boards[0].id;
+  let visible = getVisibleBoards();
+  if (!visible.length) { sportFilter = '__ALL__'; visible = boards; } // saved filter no longer matches any board
+  currentBoardId = visible[0].id;
   await loadBoard(currentBoardId);
   render();
   setupGlobal();
@@ -283,7 +287,7 @@ function render() { renderTabs(); renderGrid(); renderFilterBar(); }
 function renderTabs() {
   const bar = document.getElementById('board-tabs');
   bar.innerHTML = '';
-  boards.forEach(b => {
+  getVisibleBoards().forEach(b => {
     const btn = document.createElement('button');
     btn.className = 'board-tab' + (b.id === currentBoardId ? ' active' : '');
     btn.textContent = b.name;
@@ -376,6 +380,39 @@ function renderTabs() {
   add.title = 'New board';
   add.onclick = addBoard;
   bar.appendChild(add);
+  renderSportFilterOptions();
+}
+
+/* ── Sport filter ───────────────────────────────────────────────────────── */
+function getVisibleBoards() {
+  if (sportFilter === '__ALL__') return boards;
+  if (sportFilter === '__UNGROUPED__') return boards.filter(b => !b.group);
+  return boards.filter(b => b.group === sportFilter);
+}
+
+function renderSportFilterOptions() {
+  const sel = document.getElementById('sport-filter');
+  if (!sel) return;
+  const groups = [...new Set(boards.map(b => b.group).filter(Boolean))].sort();
+  const hasUngrouped = boards.some(b => !b.group);
+  const opts = ['<option value="__ALL__">All Sports</option>'];
+  if (hasUngrouped) opts.push('<option value="__UNGROUPED__">Ungrouped</option>');
+  groups.forEach(g => opts.push(`<option value="${g}">${g}</option>`));
+  sel.innerHTML = opts.join('');
+  sel.value = sportFilter;
+}
+
+async function onSportFilterChange(value) {
+  sportFilter = value;
+  await DB.setSetting('sportFilter', sportFilter);
+  const visible = getVisibleBoards();
+  if (visible.length) {
+    if (!visible.some(b => b.id === currentBoardId)) await switchBoard(visible[0].id);
+    else renderTabs();
+  } else {
+    tracks = [];
+    render();
+  }
 }
 
 /* Reorder boards array: move draggedId to just before/after targetId, persist order, re-render */
@@ -744,7 +781,9 @@ async function switchBoard(boardId) {
 async function addBoard() {
   const name = prompt('Board name:');
   if (!name) return;
-  const b = makeBoard(name.trim()); boards.push(b); await DB.putBoard(b); await switchBoard(b.id);
+  const b = makeBoard(name.trim());
+  if (sportFilter !== '__ALL__' && sportFilter !== '__UNGROUPED__') b.group = sportFilter;
+  boards.push(b); await DB.putBoard(b); await switchBoard(b.id);
 }
 
 async function resetAllPlayed() {
@@ -946,6 +985,7 @@ function openBoardEditor(b) {
   const m = document.getElementById('board-modal');
   m.querySelector('#be-name').value  = b.name;
   m.querySelector('#be-color').value = b.color;
+  m.querySelector('#be-group').value = b.group || '';
   m.dataset.boardId = b.id;
   const info = m.querySelector('#be-source-info');
   info.innerHTML = b.sourceUrl
@@ -965,6 +1005,7 @@ async function saveBoard() {
   const b = boards.find(x => x.id === m.dataset.boardId); if (!b) return;
   b.name  = m.querySelector('#be-name').value.trim() || b.name;
   b.color = m.querySelector('#be-color').value;
+  b.group = m.querySelector('#be-group').value.trim();
   await DB.putBoard(b); closeModal('board-modal'); renderTabs();
 }
 
@@ -1157,6 +1198,7 @@ function setupGlobal() {
   fi.onchange = () => { handleFiles(fi.files); fi.value = ''; };
 
   document.getElementById('btn-import-header').onclick = () => fi.click();
+  document.getElementById('sport-filter').onchange = e => onSportFilterChange(e.target.value);
   document.getElementById('btn-add-label').onclick     = createLabel;
   document.getElementById('btn-defaults').onclick      = openDefaults;
   document.getElementById('btn-reset').onclick         = resetAllPlayed;
