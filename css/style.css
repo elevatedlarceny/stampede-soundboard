@@ -197,7 +197,6 @@ body {
   height: 100%;
   object-fit: cover;
   border-radius: calc(var(--tile-radius) - 3px);
-  opacity: .65;
 }
 
 .tile-label {
