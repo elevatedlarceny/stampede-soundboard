@@ -67,14 +67,29 @@ function getCtx() {
    device change) — sound stops reaching speakers even though the context's
    internal clock (and so the progress bar) keeps advancing normally. This
    tears down and recreates the context, fixing that without a full reload. */
-async function resetAudioEngine() {
+async function resetAudioEngine(opts) {
+  opts = opts || {};
   stopAll(0);
   buffers.clear(); // decoded audio was tied to the old context; safe to clear, re-decodes on next play
   if (_ctx) { try { await _ctx.close(); } catch (_) {} }
   _ctx = null;
   getCtx(); // recreate immediately, bound to the current default output device
   render();
-  toast('Audio engine reset');
+  toast(opts.auto ? 'Audio device changed — reset automatically' : 'Audio engine reset');
+}
+
+/* ── Auto-reset on output device change: headphones or Bluetooth connecting
+   or disconnecting can leave the audio engine bound to a device that no
+   longer exists. Rather than requiring a manual "Reset Audio Engine" tap
+   (or a full quit-and-reopen of the browser) every time that happens,
+   listen for the change and do it automatically, before anyone notices. */
+function setupAutoAudioReset() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.addEventListener) return;
+  let debounceTimer = null;
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => resetAudioEngine({ auto: true }), 400);
+  });
 }
 
 const buffers = new Map();
@@ -247,6 +262,7 @@ async function init() {
   await loadBoard(currentBoardId);
   render();
   setupGlobal();
+  setupAutoAudioReset();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   // On a fresh device with no local data, auto-load board.json from the server
   const allTracks = await DB.getAllTracks();
