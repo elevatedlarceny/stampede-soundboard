@@ -14,7 +14,7 @@
   <title>Gametime Sounds</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.css?v=20">
+  <link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body>
 
@@ -63,7 +63,7 @@
       <textarea id="te-name" rows="2"></textarea>
     </div>
 
-    <div class="form-row row-inline">
+    <div class="form-row row-inline" id="te-color-row">
       <label>Color</label>
       <input type="color" id="te-color">
     </div>
@@ -191,6 +191,7 @@
       <button id="be-save" class="btn-primary">Save</button>
       <button id="be-check-updates" class="btn-secondary">Check for Updates</button>
       <button id="be-repair-audio" class="btn-secondary">Repair Missing Audio</button>
+      <button id="be-sort-alpha" class="btn-secondary">Sort Alphabetically</button>
       <button id="be-export" class="btn-secondary">Export Board</button>
       <button id="be-github" class="btn-secondary">GitHub Export</button>
       <button id="be-import-btn" class="btn-secondary">Import Board</button>
@@ -243,6 +244,6 @@
 <!-- ── Toast ── -->
 <div id="toast"></div>
 
-<script src="js/bundle.js?v=17"></script>
+<script src="js/bundle.js?v=19"></script>
 </body>
 </html>
