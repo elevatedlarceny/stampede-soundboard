@@ -484,7 +484,7 @@ function buildTile(t) {
   tile.dataset.id  = t.id;
   tile.dataset.col = t.gridCol;
   tile.dataset.row = t.gridRow;
-  tile.style.backgroundColor = t.color;
+  tile.style.backgroundColor = t.image ? 'transparent' : t.color;
   tile.draggable = true;
 
   if (t.image) {
@@ -852,6 +852,7 @@ function openTrackEditor(t) {
   const hasImage = !!t.image;
   document.getElementById('te-remove-image').style.display = hasImage ? '' : 'none';
   document.getElementById('te-hide-label-row').style.display = hasImage ? '' : 'none';
+  document.getElementById('te-color-row').style.display = hasImage ? 'none' : '';
   if (hasImage) m.querySelector('#te-hide-label').checked = !!t.hideLabel;
 
   m.classList.remove('hidden');
@@ -961,6 +962,7 @@ function setTrackImage() {
         await DB.putTrack(t);
         document.getElementById('te-remove-image').style.display = '';
         document.getElementById('te-hide-label-row').style.display = '';
+        document.getElementById('te-color-row').style.display = 'none';
         renderGrid();
       }
     };
@@ -976,6 +978,7 @@ async function removeTrackImage() {
   document.getElementById('te-remove-image').style.display = 'none';
   document.getElementById('te-hide-label-row').style.display = 'none';
   document.getElementById('te-hide-label').checked = false;
+  document.getElementById('te-color-row').style.display = '';
   renderGrid();
   toast('Image removed');
 }
@@ -1223,6 +1226,7 @@ function setupGlobal() {
   document.getElementById('be-save').onclick          = saveBoard;
   document.getElementById('be-check-updates').onclick  = () => checkForUpdates(document.getElementById('board-modal').dataset.boardId);
   document.getElementById('be-repair-audio').onclick   = repairMissingAudioForCurrentBoard;
+  document.getElementById('be-sort-alpha').onclick     = () => sortBoardAlphabetically(document.getElementById('board-modal').dataset.boardId);
   document.getElementById('be-export').onclick        = exportBoard;
   document.getElementById('be-github').onclick        = exportBoardForGithub;
   document.getElementById('be-import-btn').onclick    = () => document.getElementById('board-import-input').click();
@@ -1457,6 +1461,33 @@ async function repairMissingAudioForCurrentBoard() {
   toast('Checking ' + board.name + ' for missing audio…');
   await repairBoardAudio(board);
   closeModal('board-modal');
+}
+
+/* ── Sort Alphabetically: re-lays-out every tile on a board (tracks and
+   labels alike) in alphabetical order by name. Solves the "keep this board
+   alphabetized" problem directly, rather than requiring manual one-by-one
+   drag reordering every time a tile is added. ─────────────────────────── */
+async function sortBoardAlphabetically(boardId) {
+  const board = boards.find(b => b.id === boardId);
+  if (!board) return;
+  const boardTracks = await DB.getTracksForBoard(board.id);
+  if (!boardTracks.length) { toast('No tiles to sort'); return; }
+  if (!confirm(`Sort all ${boardTracks.length} tiles on "${board.name}" alphabetically by name? This rearranges their grid positions.`)) {
+    return;
+  }
+  const sorted = [...boardTracks].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true })
+  );
+  const cols = getGridCols();
+  for (let i = 0; i < sorted.length; i++) {
+    sorted[i].gridCol = i % cols;
+    sorted[i].gridRow = Math.floor(i / cols);
+    await DB.putTrack(sorted[i]);
+  }
+  if (board.id === currentBoardId) await loadBoard(board.id);
+  render();
+  closeModal('board-modal');
+  toast(`Sorted ${sorted.length} tiles alphabetically`);
 }
 
 async function repairAllBoardsAudio() {
