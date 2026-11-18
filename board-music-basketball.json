@@ -1,35 +1,35 @@
 {
   "format": "stampede-board-v1",
-  "exportedAt": "2026-11-18T04:34:35.030Z",
+  "exportedAt": "2026-11-18T18:35:02.088Z",
   "board": {
     "name": "Music - Basketball",
     "color": "#16213e"
   },
   "tracks": [
     {
-      "id": "mwlmgw1g0bmwk967nu6t",
+      "id": "mwmgne5tj0zlx9hh28m",
       "boardId": "mwlmb50cygfk5dwgxnj",
-      "name": "*Horse Whinney",
+      "name": "Horse Whinney NEW",
       "type": "track",
-      "color": "#aa7942",
+      "color": "#0f3460",
       "image": null,
-      "order": 9999,
+      "order": 45,
       "gridCol": 0,
       "gridRow": 0,
       "volume": 1,
       "fadeIn": 0,
-      "fadeOut": 3,
+      "fadeOut": 1,
       "trimStart": 0,
       "trimEnd": 0,
       "autoFadeOnStop": true,
       "autoPlayNext": false,
       "loop": false,
       "hideLabel": false,
-      "hotkey": "h",
+      "hotkey": null,
       "tags": [],
-      "audioFile": "Horse Whinney.mp3",
+      "audioFile": "Horse Whinney NEW.mp3",
       "hasPlayed": false,
-      "audioUrl": "audio/Music - Basketball/Horse Whinney.mp3"
+      "audioUrl": "audio/Music - Basketball/Horse Whinney NEW.mp3"
     },
     {
       "id": "mwlmef6us16w8hsm0o",
